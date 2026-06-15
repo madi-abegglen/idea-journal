@@ -230,6 +230,18 @@ export default function JournalPage() {
     }
   }
 
+  // Step back to previous question, restoring the previously entered answer
+  function handlePreviousQuestion() {
+    if (currentQ === 0) {
+      // If on first question, go back to the dump screen
+      setPhase(PHASES.DUMPING)
+    } else {
+      const prevKey = DEEPENING_QUESTIONS[currentQ - 1].key
+      setCurrentAnswer(answers[prevKey] || '')
+      setCurrentQ(currentQ - 1)
+    }
+  }
+
   // Reset all capture state back to IDLE
   function reset() {
     setPhase(PHASES.IDLE)
@@ -335,6 +347,7 @@ export default function JournalPage() {
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', padding: '14px', color: '#f0ece4', fontSize: '15px', fontFamily: "'Georgia', serif", lineHeight: 1.6, resize: 'vertical', outline: 'none' }}
             />
             <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={handlePreviousQuestion} style={{ flex: 1, background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '12px', fontSize: '13px', color: '#5a5248', cursor: 'pointer' }}>← back</button>
               <button onClick={handleSkipQuestion} style={{ flex: 1, background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '12px', fontSize: '13px', color: '#5a5248', cursor: 'pointer' }}>skip</button>
               <button onClick={handleNextQuestion} disabled={!currentAnswer.trim()} style={{ flex: 3, background: currentAnswer.trim() ? accent : 'rgba(255,255,255,0.08)', color: currentAnswer.trim() ? '#0f0d0b' : '#5a5248', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '15px', fontWeight: 600, cursor: currentAnswer.trim() ? 'pointer' : 'not-allowed' }}>
                 {currentQ < DEEPENING_QUESTIONS.length - 1 ? 'next →' : 'save it ✦'}
