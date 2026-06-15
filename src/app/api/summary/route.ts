@@ -38,10 +38,16 @@ Write only the summary, no preamble.`
     })
 
     const data = await response.json()
+
+    // Log full response for debugging
+    console.log('Anthropic response status:', response.status)
+    console.log('Anthropic response body:', JSON.stringify(data))
+
     const summary = data.content?.find((b: { type: string }) => b.type === 'text')?.text?.trim() || ''
 
     return NextResponse.json({ summary })
   } catch (error) {
-    return NextResponse.json({ summary: '' }, { status: 500 })
+    console.error('Summary route error:', error)
+    return NextResponse.json({ error: String(error), summary: '' }, { status: 500 })
   }
 }
