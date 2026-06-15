@@ -169,7 +169,7 @@ export default function JournalPage() {
   }
 
   // Request AI summary from server-side API route (keeps Anthropic key off the client)
-  async function generateSummary(ideaData: Record<string, string>) {
+  async function generateSummary(ideaData: Record<string, string | number>) {
     try {
       const res = await fetch('/api/summary', {
         method: 'POST',
