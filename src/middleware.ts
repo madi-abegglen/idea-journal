@@ -61,6 +61,6 @@ export async function middleware(request: NextRequest) {
 // This regex pattern is the current Next.js recommended approach
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|login).*)',
+    '/((?!_next/static|_next/image|favicon.ico|login|api).*)',
   ],
 }
