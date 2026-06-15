@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase/admin'
 
 function isAuthorized(request: Request): boolean {
   const secret = request.headers.get('x-api-secret')
