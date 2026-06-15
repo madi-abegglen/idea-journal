@@ -116,6 +116,12 @@ function IdeaDetail({ idea, onBack }: { idea: Idea; onBack: () => void }) {
           <div style={{ fontFamily: "'Georgia', serif", fontSize: '15px', color: '#f0ece4', lineHeight: 1.4 }}>"{idea.energy}"</div>
         </div>
       )}
+      {idea.summary && (
+        <div>
+          <div style={{ fontSize: '11px', color: '#c4a882', marginBottom: '5px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>The essence</div>
+          <div style={{ background: 'rgba(196,168,130,0.08)', border: '1px solid rgba(196,168,130,0.2)', borderRadius: '12px', padding: '14px 16px', fontFamily: "'Georgia', serif", fontSize: '14px', color: '#e0d8cc', lineHeight: 1.65, fontStyle: 'italic' }}>{idea.summary}</div>
+        </div>
+      )}
       <div style={{ paddingTop: '4px', fontSize: '11px', color: '#5a5248' }}>Captured {formatDate(idea.timestamp)}</div>
     </div>
   )
