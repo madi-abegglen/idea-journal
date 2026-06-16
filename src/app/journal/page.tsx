@@ -383,6 +383,7 @@ export default function JournalPage() {
   const [firstName, setFirstName] = useState('')
   const [userEmail, setUserEmail] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [profileHover, setProfileHover] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const router = useRouter()
 
@@ -527,11 +528,23 @@ export default function JournalPage() {
 
         {/* Header — title + nav controls */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          {/* Clicking the name/title opens the profile menu */}
-          <button onClick={() => setMenuOpen(true)} style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer' }}>
-            {/* Possessive eyebrow only shows when we know the user's first name */}
+          {/* Clicking the name/title opens the profile menu — icon + chevron + hover signal it's interactive */}
+          <button
+            onClick={() => setMenuOpen(true)}
+            onMouseEnter={() => setProfileHover(true)}
+            onMouseLeave={() => setProfileHover(false)}
+            style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer' }}
+          >
+            {/* Possessive eyebrow with a profile icon + chevron; brightens on hover */}
             {firstName && (
-              <div style={{ fontSize: '11px', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#8a8070', marginBottom: '3px' }}>{`${firstName}'s`} ▾</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', letterSpacing: '0.14em', textTransform: 'uppercase', color: profileHover ? accent : '#8a8070', marginBottom: '3px', transition: 'color 0.15s' }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
+                  <circle cx="12" cy="8" r="4" />
+                  <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
+                </svg>
+                <span style={{ textDecoration: profileHover ? 'underline' : 'none' }}>{`${firstName}'s`}</span>
+                <span>▾</span>
+              </div>
             )}
             <div style={{ fontFamily: "'Georgia', serif", fontSize: '22px', color: accent }}>Idea Journal</div>
           </button>
