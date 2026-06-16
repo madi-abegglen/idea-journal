@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('') // info message, e.g. "confirm your email"
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const supabase = createClient()
@@ -24,6 +25,7 @@ export default function LoginPage() {
   async function handleLogin() {
     setLoading(true)
     setError('')
+    setNotice('')
 
     const { error } = await supabase.auth.signInWithPassword({ email, password })
 
@@ -40,8 +42,9 @@ export default function LoginPage() {
   async function handleSignUp() {
     setLoading(true)
     setError('')
+    setNotice('')
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { first_name: firstName.trim() } },
@@ -49,6 +52,14 @@ export default function LoginPage() {
 
     if (error) {
       setError(error.message)
+      setLoading(false)
+      return
+    }
+
+    // With email confirmation enabled, signUp returns no session — prompt to confirm instead of redirecting
+    if (!data.session) {
+      setNotice('Check your email to confirm your account, then sign in.')
+      setMode('signin')
       setLoading(false)
       return
     }
@@ -63,10 +74,11 @@ export default function LoginPage() {
     else handleLogin()
   }
 
-  // Flip between sign in / sign up and clear any stale error
+  // Flip between sign in / sign up and clear any stale messages
   function toggleMode() {
     setMode(isSignUp ? 'signin' : 'signup')
     setError('')
+    setNotice('')
   }
 
   const bg = '#0f0d0b'
@@ -87,7 +99,7 @@ export default function LoginPage() {
               type="text"
               value={firstName}
               onChange={e => setFirstName(e.target.value)}
-              placeholder="First name"
+              placeholder="What name do you go by?"
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', padding: '14px', color: '#f0ece4', fontSize: '15px', outline: 'none', fontFamily: 'inherit' }}
             />
           )}
@@ -109,6 +121,7 @@ export default function LoginPage() {
         </div>
 
         {error && <div style={{ fontSize: '13px', color: '#e07070' }}>{error}</div>}
+        {notice && <div style={{ fontSize: '13px', color: accent }}>{notice}</div>}
 
         <button
           onClick={handleSubmit}

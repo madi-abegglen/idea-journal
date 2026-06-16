@@ -243,6 +243,131 @@ function IdeaDetail({
   )
 }
 
+// Slide-out profile menu — account settings + sign out. Opened from the header name.
+function ProfileMenu({
+  supabase,
+  name,
+  email,
+  onClose,
+  onNameSaved,
+  onSignOut,
+}: {
+  supabase: ReturnType<typeof createClient>
+  name: string
+  email: string
+  onClose: () => void
+  onNameSaved: (name: string) => void
+  onSignOut: () => void
+}) {
+  const [nameInput, setNameInput] = useState(name)
+  const [emailInput, setEmailInput] = useState(email)
+  const [passwordInput, setPasswordInput] = useState('')
+  const [busy, setBusy] = useState('') // which action is in flight: '' | 'name' | 'email' | 'password' | 'delete'
+  const [error, setError] = useState('')
+  const [status, setStatus] = useState('') // success/confirmation feedback
+
+  // Update first_name in user_metadata, then refresh the header greeting
+  async function saveName() {
+    if (!nameInput.trim() || busy) return
+    setBusy('name'); setError(''); setStatus('')
+    const { error } = await supabase.auth.updateUser({ data: { first_name: nameInput.trim() } })
+    if (error) { setError(error.message); setBusy(''); return }
+    onNameSaved(nameInput.trim())
+    setStatus('Name updated.')
+    setBusy('')
+  }
+
+  // Update the account email — Supabase sends a confirmation link before it takes effect
+  async function saveEmail() {
+    if (!emailInput.trim() || busy) return
+    setBusy('email'); setError(''); setStatus('')
+    const { error } = await supabase.auth.updateUser({ email: emailInput.trim() })
+    if (error) { setError(error.message); setBusy(''); return }
+    setStatus('Check your inbox to confirm the new email.')
+    setBusy('')
+  }
+
+  // Update the account password
+  async function savePassword() {
+    if (!passwordInput.trim() || busy) return
+    setBusy('password'); setError(''); setStatus('')
+    const { error } = await supabase.auth.updateUser({ password: passwordInput.trim() })
+    if (error) { setError(error.message); setBusy(''); return }
+    setPasswordInput('')
+    setStatus('Password updated.')
+    setBusy('')
+  }
+
+  // Confirm, then delete the user's ideas and their auth account (via the delete_user_account RPC)
+  async function deleteAccount() {
+    if (!window.confirm('Delete your account and all your ideas? This can’t be undone.')) return
+    setBusy('delete'); setError(''); setStatus('')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error()
+      const { error: ideasErr } = await supabase.from('ideas').delete().eq('user_id', user.id)
+      if (ideasErr) throw ideasErr
+      const { error: rpcErr } = await supabase.rpc('delete_user_account')
+      if (rpcErr) throw rpcErr
+      onSignOut() // clears the local session and redirects to /login
+    } catch {
+      setError('Failed to delete account. Please try again.')
+      setBusy('')
+    }
+  }
+
+  const accent = '#c4a882'
+  const inputStyle = { width: '100%', boxSizing: 'border-box' as const, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', padding: '12px', color: '#f0ece4', fontSize: '14px', outline: 'none', fontFamily: 'inherit' }
+  const labelStyle = { fontSize: '11px', color: '#8a8070', marginBottom: '6px', letterSpacing: '0.08em', textTransform: 'uppercase' as const }
+  const saveBtnStyle = { background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#8a8070', cursor: 'pointer', fontSize: '12px', padding: '8px 12px', marginTop: '8px', alignSelf: 'flex-start' as const }
+
+  return (
+    <>
+      {/* Backdrop — click to dismiss */}
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10 }} />
+      {/* Panel */}
+      <div style={{ position: 'fixed', top: 0, right: 0, height: '100vh', width: 'min(360px, 90vw)', background: '#15120f', borderLeft: '1px solid rgba(255,255,255,0.1)', zIndex: 11, padding: '28px 22px', boxSizing: 'border-box', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontFamily: "'Georgia', serif", fontSize: '18px', color: accent }}>Profile</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#8a8070', cursor: 'pointer', fontSize: '22px', lineHeight: 1, padding: 0 }}>×</button>
+        </div>
+
+        {error && <div style={{ fontSize: '13px', color: '#e07070' }}>{error}</div>}
+        {status && <div style={{ fontSize: '13px', color: accent }}>{status}</div>}
+
+        {/* Edit name */}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={labelStyle}>Name</div>
+          <input type="text" value={nameInput} onChange={e => setNameInput(e.target.value)} placeholder="What name do you go by?" style={inputStyle} />
+          <button onClick={saveName} disabled={!!busy} style={saveBtnStyle}>{busy === 'name' ? 'saving…' : 'save name'}</button>
+        </div>
+
+        {/* Change email */}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={labelStyle}>Email</div>
+          <input type="email" value={emailInput} onChange={e => setEmailInput(e.target.value)} placeholder="Email" style={inputStyle} />
+          <button onClick={saveEmail} disabled={!!busy} style={saveBtnStyle}>{busy === 'email' ? 'saving…' : 'save email'}</button>
+        </div>
+
+        {/* Change password */}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={labelStyle}>Password</div>
+          <input type="password" value={passwordInput} onChange={e => setPasswordInput(e.target.value)} placeholder="New password" style={inputStyle} />
+          <button onClick={savePassword} disabled={!!busy} style={saveBtnStyle}>{busy === 'password' ? 'saving…' : 'save password'}</button>
+        </div>
+
+        <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)' }} />
+
+        {/* Account actions */}
+        <button onClick={onSignOut} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '12px', fontSize: '14px', color: '#8a8070', cursor: 'pointer' }}>sign out</button>
+        <button onClick={deleteAccount} disabled={!!busy} style={{ background: 'none', border: '1px solid rgba(224,112,112,0.3)', borderRadius: '10px', padding: '12px', fontSize: '14px', color: '#e07070', cursor: busy ? 'not-allowed' : 'pointer' }}>{busy === 'delete' ? 'deleting…' : 'delete account'}</button>
+
+      </div>
+    </>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function JournalPage() {
@@ -256,6 +381,8 @@ export default function JournalPage() {
   const [aiSummary, setAiSummary] = useState('')
   const [error, setError] = useState('')
   const [firstName, setFirstName] = useState('')
+  const [userEmail, setUserEmail] = useState('')
+  const [menuOpen, setMenuOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const router = useRouter()
 
@@ -286,10 +413,11 @@ export default function JournalPage() {
     setIdeas(data || [])
   }
 
-  // Read the signed-in user's first name (set at sign-up) for the header greeting
+  // Read the signed-in user's first name (set at sign-up) + email for the header and profile menu
   async function loadUser() {
     const { data: { user } } = await supabase.auth.getUser()
     setFirstName(user?.user_metadata?.first_name || '')
+    setUserEmail(user?.email || '')
   }
 
   // Sign out and redirect to login
@@ -399,13 +527,14 @@ export default function JournalPage() {
 
         {/* Header — title + nav controls */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
+          {/* Clicking the name/title opens the profile menu */}
+          <button onClick={() => setMenuOpen(true)} style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer' }}>
             {/* Possessive eyebrow only shows when we know the user's first name */}
             {firstName && (
-              <div style={{ fontSize: '11px', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#8a8070', marginBottom: '3px' }}>{`${firstName}'s`}</div>
+              <div style={{ fontSize: '11px', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#8a8070', marginBottom: '3px' }}>{`${firstName}'s`} ▾</div>
             )}
             <div style={{ fontFamily: "'Georgia', serif", fontSize: '22px', color: accent }}>Idea Journal</div>
-          </div>
+          </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {(phase === PHASES.IDLE || phase === PHASES.VIEWING) && ideas.length > 0 && (
               <button
@@ -418,9 +547,20 @@ export default function JournalPage() {
             {phase !== PHASES.IDLE && phase !== PHASES.VIEWING && (
               <button onClick={reset} style={{ background: 'none', border: 'none', color: '#5a5248', cursor: 'pointer', fontSize: '12px' }}>cancel</button>
             )}
-            <button onClick={handleSignOut} style={{ background: 'none', border: 'none', color: '#5a5248', cursor: 'pointer', fontSize: '12px' }}>sign out</button>
           </div>
         </div>
+
+        {/* Profile menu — mounted only while open so its form resets each time */}
+        {menuOpen && (
+          <ProfileMenu
+            supabase={supabase}
+            name={firstName}
+            email={userEmail}
+            onClose={() => setMenuOpen(false)}
+            onNameSaved={setFirstName}
+            onSignOut={handleSignOut}
+          />
+        )}
 
         {error && <div style={{ fontSize: '13px', color: '#e07070' }}>{error}</div>}
 
