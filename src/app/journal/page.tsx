@@ -255,15 +255,17 @@ export default function JournalPage() {
   const [selectedIdea, setSelectedIdea] = useState<Idea | null>(null)
   const [aiSummary, setAiSummary] = useState('')
   const [error, setError] = useState('')
+  const [firstName, setFirstName] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const router = useRouter()
 
   // Browser-side Supabase client — uses anon key + user session cookie
   const supabase = createClient()
 
-  // Load ideas from Supabase on mount
+  // Load ideas and the signed-in user on mount
   useEffect(() => {
     loadIdeas()
+    loadUser()
   }, [])
 
   // Auto-focus textarea when entering capture or deepening phases
@@ -282,6 +284,12 @@ export default function JournalPage() {
       .order('timestamp', { ascending: false })
     if (error) { setError('Failed to load ideas.'); return }
     setIdeas(data || [])
+  }
+
+  // Read the signed-in user's first name (set at sign-up) for the header greeting
+  async function loadUser() {
+    const { data: { user } } = await supabase.auth.getUser()
+    setFirstName(user?.user_metadata?.first_name || '')
   }
 
   // Sign out and redirect to login
@@ -392,7 +400,10 @@ export default function JournalPage() {
         {/* Header — title + nav controls */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: '11px', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#8a8070', marginBottom: '3px' }}>Madi's</div>
+            {/* Possessive eyebrow only shows when we know the user's first name */}
+            {firstName && (
+              <div style={{ fontSize: '11px', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#8a8070', marginBottom: '3px' }}>{`${firstName}'s`}</div>
+            )}
             <div style={{ fontFamily: "'Georgia', serif", fontSize: '22px', color: accent }}>Idea Journal</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
