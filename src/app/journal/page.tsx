@@ -34,10 +34,20 @@ const DEEPENING_QUESTIONS = [
   { key: 'energy', label: 'How does it feel?', placeholder: "One line — the vibe. 'This could change everything.' 'Finally.' 'Why hasn't anyone done this?'" },
 ]
 
+// Fields shown when editing an idea in the detail view — labels mirror the read-only view
+const EDITABLE_FIELDS = [
+  { key: 'dump', label: 'The idea', rows: 4 },
+  { key: 'trigger', label: 'What sparked it', rows: 2 },
+  { key: 'problem', label: 'Problem it solves', rows: 2 },
+  { key: 'magic', label: 'The exciting angle', rows: 2 },
+  { key: 'energy', label: 'The feeling', rows: 2 },
+]
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Idea = {
   id: string
+  user_id?: string
   dump: string
   trigger?: string
   problem?: string
@@ -80,49 +90,155 @@ function IdeaCard({ idea, onClick }: { idea: Idea; onClick: (idea: Idea) => void
   )
 }
 
-// Full idea detail view — shown when a card is clicked in VIEWING mode
-function IdeaDetail({ idea, onBack }: { idea: Idea; onBack: () => void }) {
+// Full idea detail view — shown when a card is clicked in VIEWING mode.
+// Supports inline editing (PATCH) and deletion (DELETE) of the idea.
+function IdeaDetail({
+  idea,
+  onBack,
+  onUpdate,
+  onDelete,
+}: {
+  idea: Idea
+  onBack: () => void
+  onUpdate: (idea: Idea) => void
+  onDelete: (id: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [fields, setFields] = useState<Record<string, string>>({})
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  // Enter edit mode — seed the form with the idea's current values
+  function startEditing() {
+    setFields({
+      dump: idea.dump || '',
+      trigger: idea.trigger || '',
+      problem: idea.problem || '',
+      magic: idea.magic || '',
+      energy: idea.energy || '',
+    })
+    setError('')
+    setEditing(true)
+  }
+
+  // Persist edits via PATCH /api/ideas/[id] (cookie session auth), then hand the fresh row to the parent
+  async function saveEdits() {
+    setBusy(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/ideas/${idea.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fields),
+      })
+      if (!res.ok) throw new Error()
+      const updated = await res.json()
+      onUpdate(updated)
+      setEditing(false)
+    } catch {
+      setError('Failed to save changes. Please try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Confirm, then remove via DELETE /api/ideas/[id] and return to the list
+  async function deleteIdea() {
+    if (!window.confirm('Delete this idea? This can’t be undone.')) return
+    setBusy(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/ideas/${idea.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      onDelete(idea.id)
+    } catch {
+      setError('Failed to delete idea. Please try again.')
+      setBusy(false)
+    }
+  }
+
+  // Disable save until the core idea isn't empty
+  const canSave = !busy && !!fields.dump?.trim()
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#8a8070', cursor: 'pointer', fontSize: '13px', textAlign: 'left', padding: 0 }}>
-        ← back
-      </button>
-      <div>
-        <div style={{ fontSize: '11px', color: '#8a8070', marginBottom: '6px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>The idea</div>
-        <div style={{ fontFamily: "'Georgia', serif", fontSize: '18px', color: '#f0ece4', lineHeight: 1.5 }}>{idea.dump}</div>
-      </div>
-      <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)' }} />
-      {idea.trigger && (
-        <div>
-          <div style={{ fontSize: '11px', color: '#8a8070', marginBottom: '5px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>What sparked it</div>
-          <div style={{ fontSize: '14px', color: '#c8bfb0', lineHeight: 1.5 }}>{idea.trigger}</div>
+      {!editing && (
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#8a8070', cursor: 'pointer', fontSize: '13px', textAlign: 'left', padding: 0 }}>
+          ← back
+        </button>
+      )}
+
+      {error && <div style={{ fontSize: '13px', color: '#e07070' }}>{error}</div>}
+
+      {editing ? (
+        // ─── Edit form — one labeled textarea per editable field ───
+        EDITABLE_FIELDS.map(f => (
+          <div key={f.key}>
+            <div style={{ fontSize: '11px', color: '#8a8070', marginBottom: '5px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{f.label}</div>
+            <textarea
+              value={fields[f.key] ?? ''}
+              onChange={e => setFields(prev => ({ ...prev, [f.key]: e.target.value }))}
+              rows={f.rows}
+              style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', padding: '12px', color: '#f0ece4', fontSize: '14px', fontFamily: "'Georgia', serif", lineHeight: 1.5, resize: 'vertical', outline: 'none' }}
+            />
+          </div>
+        ))
+      ) : (
+        // ─── Read-only detail ───
+        <>
+          <div>
+            <div style={{ fontSize: '11px', color: '#8a8070', marginBottom: '6px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>The idea</div>
+            <div style={{ fontFamily: "'Georgia', serif", fontSize: '18px', color: '#f0ece4', lineHeight: 1.5 }}>{idea.dump}</div>
+          </div>
+          <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)' }} />
+          {idea.trigger && (
+            <div>
+              <div style={{ fontSize: '11px', color: '#8a8070', marginBottom: '5px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>What sparked it</div>
+              <div style={{ fontSize: '14px', color: '#c8bfb0', lineHeight: 1.5 }}>{idea.trigger}</div>
+            </div>
+          )}
+          {idea.problem && (
+            <div>
+              <div style={{ fontSize: '11px', color: '#8a8070', marginBottom: '5px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Problem it solves</div>
+              <div style={{ fontSize: '14px', color: '#c8bfb0', lineHeight: 1.5 }}>{idea.problem}</div>
+            </div>
+          )}
+          {idea.magic && (
+            <div>
+              <div style={{ fontSize: '11px', color: '#c4a882', marginBottom: '5px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>✦ The exciting angle</div>
+              <div style={{ fontSize: '14px', color: '#c4a882', lineHeight: 1.5, fontStyle: 'italic' }}>{idea.magic}</div>
+            </div>
+          )}
+          {idea.energy && (
+            <div>
+              <div style={{ fontSize: '11px', color: '#8a8070', marginBottom: '5px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>The feeling</div>
+              <div style={{ fontFamily: "'Georgia', serif", fontSize: '15px', color: '#f0ece4', lineHeight: 1.4 }}>"{idea.energy}"</div>
+            </div>
+          )}
+          {idea.summary && (
+            <div>
+              <div style={{ fontSize: '11px', color: '#c4a882', marginBottom: '5px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>The essence</div>
+              <div style={{ background: 'rgba(196,168,130,0.08)', border: '1px solid rgba(196,168,130,0.2)', borderRadius: '12px', padding: '14px 16px', fontFamily: "'Georgia', serif", fontSize: '14px', color: '#e0d8cc', lineHeight: 1.65, fontStyle: 'italic' }}>{idea.summary}</div>
+            </div>
+          )}
+          <div style={{ paddingTop: '4px', fontSize: '11px', color: '#5a5248' }}>Captured {formatDate(idea.timestamp)}</div>
+        </>
+      )}
+
+      {/* Action buttons — save/cancel while editing, edit/delete otherwise */}
+      {editing ? (
+        <div style={{ display: 'flex', gap: '10px', paddingTop: '4px' }}>
+          <button onClick={() => setEditing(false)} disabled={busy} style={{ flex: 1, background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '12px', fontSize: '13px', color: '#5a5248', cursor: busy ? 'not-allowed' : 'pointer' }}>cancel</button>
+          <button onClick={saveEdits} disabled={!canSave} style={{ flex: 3, background: canSave ? '#c4a882' : 'rgba(255,255,255,0.08)', color: canSave ? '#0f0d0b' : '#5a5248', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '15px', fontWeight: 600, cursor: canSave ? 'pointer' : 'not-allowed' }}>
+            {busy ? 'saving…' : 'save changes'}
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: '10px', paddingTop: '4px' }}>
+          <button onClick={startEditing} style={{ flex: 1, background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px', fontSize: '13px', color: '#8a8070', cursor: 'pointer' }}>edit</button>
+          <button onClick={deleteIdea} disabled={busy} style={{ flex: 1, background: 'none', border: '1px solid rgba(224,112,112,0.3)', borderRadius: '10px', padding: '11px', fontSize: '13px', color: '#e07070', cursor: busy ? 'not-allowed' : 'pointer' }}>{busy ? 'deleting…' : 'delete'}</button>
         </div>
       )}
-      {idea.problem && (
-        <div>
-          <div style={{ fontSize: '11px', color: '#8a8070', marginBottom: '5px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Problem it solves</div>
-          <div style={{ fontSize: '14px', color: '#c8bfb0', lineHeight: 1.5 }}>{idea.problem}</div>
-        </div>
-      )}
-      {idea.magic && (
-        <div>
-          <div style={{ fontSize: '11px', color: '#c4a882', marginBottom: '5px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>✦ The exciting angle</div>
-          <div style={{ fontSize: '14px', color: '#c4a882', lineHeight: 1.5, fontStyle: 'italic' }}>{idea.magic}</div>
-        </div>
-      )}
-      {idea.energy && (
-        <div>
-          <div style={{ fontSize: '11px', color: '#8a8070', marginBottom: '5px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>The feeling</div>
-          <div style={{ fontFamily: "'Georgia', serif", fontSize: '15px', color: '#f0ece4', lineHeight: 1.4 }}>"{idea.energy}"</div>
-        </div>
-      )}
-      {idea.summary && (
-        <div>
-          <div style={{ fontSize: '11px', color: '#c4a882', marginBottom: '5px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>The essence</div>
-          <div style={{ background: 'rgba(196,168,130,0.08)', border: '1px solid rgba(196,168,130,0.2)', borderRadius: '12px', padding: '14px 16px', fontFamily: "'Georgia', serif", fontSize: '14px', color: '#e0d8cc', lineHeight: 1.65, fontStyle: 'italic' }}>{idea.summary}</div>
-        </div>
-      )}
-      <div style={{ paddingTop: '4px', fontSize: '11px', color: '#5a5248' }}>Captured {formatDate(idea.timestamp)}</div>
     </div>
   )
 }
@@ -193,11 +309,13 @@ export default function JournalPage() {
   async function finishCapture() {
     setPhase(PHASES.SAVING)
     try {
+      // Tag the idea with its owner so per-user RLS policies can scope access
+      const { data: { user } } = await supabase.auth.getUser()
       const ideaData = { dump, ...answers, timestamp: Date.now() }
       const summary = await generateSummary(ideaData)
       const { data, error } = await supabase
         .from('ideas')
-        .insert([{ ...ideaData, summary }])
+        .insert([{ ...ideaData, summary, user_id: user?.id }])
         .select()
         .single()
       if (error) throw error
@@ -392,7 +510,18 @@ export default function JournalPage() {
         {phase === PHASES.VIEWING && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {selectedIdea ? (
-              <IdeaDetail idea={selectedIdea} onBack={() => setSelectedIdea(null)} />
+              <IdeaDetail
+                idea={selectedIdea}
+                onBack={() => setSelectedIdea(null)}
+                onUpdate={updated => {
+                  setIdeas(prev => prev.map(i => (i.id === updated.id ? updated : i)))
+                  setSelectedIdea(updated)
+                }}
+                onDelete={id => {
+                  setIdeas(prev => prev.filter(i => i.id !== id))
+                  setSelectedIdea(null)
+                }}
+              />
             ) : (
               <>
                 <div style={{ fontSize: '12px', color: '#5a5248' }}>{ideas.length} idea{ideas.length !== 1 ? 's' : ''} captured</div>

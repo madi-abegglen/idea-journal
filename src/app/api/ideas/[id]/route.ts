@@ -1,17 +1,18 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase/admin'
-
-function isAuthorized(request: Request): boolean {
-  const secret = request.headers.get('x-api-secret')
-  return secret === process.env.API_SECRET
-}
+import { createClient } from '@/lib/supabase/server'
 
 // PATCH - update an idea
+// Auth: requires a valid logged-in Supabase session (cookie-based, same as the journal page).
+// Uses the session-scoped client so RLS applies — no shared secret needed.
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!isAuthorized(request)) {
+  const supabase = await createClient()
+
+  // getUser() verifies the JWT server-side — never trust getSession() for auth
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -33,11 +34,15 @@ export async function PATCH(
 }
 
 // DELETE an idea
+// Auth: requires a valid logged-in Supabase session (cookie-based, same as the journal page).
 export async function DELETE(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!isAuthorized(request)) {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
