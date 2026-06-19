@@ -90,6 +90,81 @@ function IdeaCard({ idea, onClick }: { idea: Idea; onClick: (idea: Idea) => void
   )
 }
 
+// Quiet "regenerate summary?" affordance shown beneath an essence/summary.
+// Re-runs the AI summary from the idea's fields (POST /api/summary), persists it
+// (PATCH /api/ideas/[id]), then hands the freshly-saved row back to the parent so
+// the displayed summary updates in place. Styled as a muted suggestion, not a button.
+function RegenerateSummary({
+  idea,
+  onRegenerated,
+}: {
+  idea: { id: string; dump: string; trigger?: string; problem?: string; magic?: string; energy?: string }
+  onRegenerated: (idea: Idea) => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [hover, setHover] = useState(false)
+  const [error, setError] = useState('')
+
+  async function regenerate() {
+    if (busy) return
+    setBusy(true)
+    setError('')
+    try {
+      // Generate a fresh summary from the idea's existing fields…
+      const sumRes = await fetch('/api/summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dump: idea.dump || '',
+          trigger: idea.trigger || '',
+          problem: idea.problem || '',
+          magic: idea.magic || '',
+          energy: idea.energy || '',
+        }),
+      })
+      const { summary } = await sumRes.json()
+      if (!summary) throw new Error()
+      // …then persist it and surface the updated row to the parent
+      const patchRes = await fetch(`/api/ideas/${idea.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ summary }),
+      })
+      if (!patchRes.ok) throw new Error()
+      const updated = await patchRes.json()
+      onRegenerated(updated)
+    } catch {
+      setError('Couldn’t regenerate. Try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Muted by default, brightens on hover, dims while working
+  const color = busy ? '#5a5248' : hover ? '#c4a882' : '#8a8070'
+
+  return (
+    <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <button
+        onClick={regenerate}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        disabled={busy}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', alignSelf: 'flex-start', background: 'none', border: 'none', padding: 0, color, fontSize: '12px', fontFamily: 'inherit', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.7 : 1, transition: 'color 0.15s, opacity 0.15s' }}
+      >
+        {/* Circular arrows — spins while regenerating */}
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block', animation: busy ? 'spin 0.8s linear infinite' : 'none' }}>
+          <path d="M23 4v6h-6" />
+          <path d="M1 20v-6h6" />
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+        </svg>
+        <span>{busy ? 'regenerating…' : 'regenerate summary?'}</span>
+      </button>
+      {error && <div style={{ fontSize: '11px', color: '#e07070' }}>{error}</div>}
+    </div>
+  )
+}
+
 // Full idea detail view — shown when a card is clicked in VIEWING mode.
 // Supports inline editing (PATCH) and deletion (DELETE) of the idea.
 function IdeaDetail({
@@ -219,6 +294,7 @@ function IdeaDetail({
             <div>
               <div style={{ fontSize: '11px', color: '#c4a882', marginBottom: '5px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>The essence</div>
               <div style={{ background: 'rgba(196,168,130,0.08)', border: '1px solid rgba(196,168,130,0.2)', borderRadius: '12px', padding: '14px 16px', fontFamily: "'Georgia', serif", fontSize: '14px', color: '#e0d8cc', lineHeight: 1.65, fontStyle: 'italic' }}>{idea.summary}</div>
+              <RegenerateSummary idea={idea} onRegenerated={onUpdate} />
             </div>
           )}
           <div style={{ paddingTop: '4px', fontSize: '11px', color: '#5a5248' }}>Captured {formatDate(idea.timestamp)}</div>
@@ -379,6 +455,7 @@ export default function JournalPage() {
   const [ideas, setIdeas] = useState<Idea[]>([])
   const [selectedIdea, setSelectedIdea] = useState<Idea | null>(null)
   const [aiSummary, setAiSummary] = useState('')
+  const [savedIdea, setSavedIdea] = useState<Idea | null>(null) // the row just inserted, for the Done screen
   const [error, setError] = useState('')
   const [firstName, setFirstName] = useState('')
   const [userEmail, setUserEmail] = useState('')
@@ -460,6 +537,7 @@ export default function JournalPage() {
         .single()
       if (error) throw error
       setAiSummary(summary)
+      setSavedIdea(data)
       setIdeas(prev => [data, ...prev])
       setPhase(PHASES.DONE)
     } catch {
@@ -516,6 +594,7 @@ export default function JournalPage() {
     setCurrentQ(0)
     setCurrentAnswer('')
     setAiSummary('')
+    setSavedIdea(null)
     setSelectedIdea(null)
     setError('')
   }
@@ -665,9 +744,21 @@ export default function JournalPage() {
               <div style={{ fontFamily: "'Georgia', serif", fontSize: '16px', color: accent }}>Captured.</div>
             </div>
             {aiSummary && (
-              <div style={{ background: 'rgba(196,168,130,0.08)', border: '1px solid rgba(196,168,130,0.2)', borderRadius: '12px', padding: '16px 18px' }}>
-                <div style={{ fontSize: '11px', color: '#8a8070', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '8px' }}>The essence</div>
-                <div style={{ fontFamily: "'Georgia', serif", fontSize: '14px', color: '#e0d8cc', lineHeight: 1.65 }}>{aiSummary}</div>
+              <div>
+                <div style={{ background: 'rgba(196,168,130,0.08)', border: '1px solid rgba(196,168,130,0.2)', borderRadius: '12px', padding: '16px 18px' }}>
+                  <div style={{ fontSize: '11px', color: '#8a8070', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '8px' }}>The essence</div>
+                  <div style={{ fontFamily: "'Georgia', serif", fontSize: '14px', color: '#e0d8cc', lineHeight: 1.65 }}>{aiSummary}</div>
+                </div>
+                {savedIdea && (
+                  <RegenerateSummary
+                    idea={savedIdea}
+                    onRegenerated={updated => {
+                      setAiSummary(updated.summary || '')
+                      setSavedIdea(updated)
+                      setIdeas(prev => prev.map(i => (i.id === updated.id ? updated : i)))
+                    }}
+                  />
+                )}
               </div>
             )}
             <button onClick={reset} style={{ background: accent, color: '#0f0d0b', border: 'none', borderRadius: '10px', padding: '13px', fontSize: '15px', fontWeight: 600, cursor: 'pointer' }}>capture another</button>

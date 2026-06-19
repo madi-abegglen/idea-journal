@@ -24,3 +24,10 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Used by the "regenerate summary?" affordance while a new summary is generating */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
