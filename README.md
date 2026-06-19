@@ -11,8 +11,8 @@ A full-stack idea capture app built to preserve not just the idea, but the *feel
 Most note-taking tools capture *what* you thought, not *why it felt exciting*. Idea Journal walks you through a structured capture flow:
 
 1. **Dump** — get the raw idea out, messy is fine
-2. **Deepen** — 4 guided follow-up questions (what sparked it, what problem it solves, the exciting angle, the feeling)
-3. **Essence** — an AI-generated 2-3 sentence summary that re-captures the energy of the idea, not just the content
+2. **Deepen** — 4 guided follow-up questions (what sparked it, what problem it solves, the exciting angle, how it feels) with back/skip navigation so you can revise earlier answers
+3. **Essence** — an AI-generated 2-3 sentence summary that re-captures the energy of the idea, not just the content — regenerate it any time if it misses the mark
 
 Ideas are stored persistently in Postgres, scoped per user, and accessible from any device.
 
@@ -20,12 +20,13 @@ Ideas are stored persistently in Postgres, scoped per user, and accessible from 
 
 ## Features
 
-- **Multi-user auth** — registration with email confirmation, login, session management via Supabase Auth
-- **Guided capture flow** — dump → 4 deepening questions with back navigation → AI-generated essence summary
-- **Ideas list** — browse all captured ideas with expandable detail view
+- **Multi-user auth** — registration with email confirmation and a "What name do you go by?" prompt, login, and session management via Supabase Auth; the chosen name personalizes the journal greeting
+- **Guided capture flow** — dump → 4 deepening questions with back/skip navigation → AI-generated essence summary
+- **Regenerate summary** — a quiet "regenerate summary?" affordance on both the done screen and the idea detail view re-runs the AI summary from the saved fields and updates it in place
+- **Ideas list** — browse all captured ideas with an expandable detail view
 - **Edit & delete** — inline editing of all fields, delete with confirmation
-- **Profile management** — update name, email, password, or delete account (via secure Postgres RPC)
-- **Per-user data isolation** — Row Level Security ensures users only ever see their own ideas
+- **Profile menu** — update name, email (with confirmation link), or password; sign out; or delete the account and all its ideas (via a secure Postgres RPC)
+- **Per-user data isolation** — Row Level Security ensures users only ever see their own ideas (`auth.uid() = user_id`)
 
 ---
 
@@ -52,7 +53,9 @@ Next.js App Router
     └── /journal        → protected by middleware.ts
             ↓
     /api/ideas/[id]     → PATCH, DELETE — authenticated via Supabase session cookies
+                          (PATCH also persists regenerated summaries)
     /api/summary        → POST — server-side Anthropic API call (key never touches client)
+                          used for both initial capture and "regenerate summary?"
             ↓
     Supabase Postgres   → RLS enabled, all reads/writes scoped to auth.uid()
 ```
@@ -79,9 +82,12 @@ src/
 │   │   └── summary/
 │   │       └── route.ts          # Server-side AI summary generation
 │   ├── journal/
-│   │   └── page.tsx              # Main journal UI — capture flow, ideas list, profile menu
-│   └── login/
-│       └── page.tsx              # Sign in + registration (toggleable)
+│   │   └── page.tsx              # Main journal UI — capture flow, regenerate, ideas list, profile menu
+│   ├── login/
+│   │   └── page.tsx              # Sign in + registration with name prompt (toggleable)
+│   ├── layout.tsx               # Root layout
+│   ├── globals.css              # Global styles (incl. spin keyframe for regenerate affordance)
+│   └── page.tsx                 # Landing — redirects into the journal
 ├── lib/
 │   └── supabase/
 │       ├── server.ts             # SSR client (middleware + server components)
