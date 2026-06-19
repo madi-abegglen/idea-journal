@@ -689,7 +689,13 @@ export default function JournalPage() {
               placeholder="What's the idea? Say it however it comes..."
               rows={5}
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', padding: '14px', color: '#f0ece4', fontSize: '15px', fontFamily: "'Georgia', serif", lineHeight: 1.6, resize: 'vertical', outline: 'none' }}
-              onKeyDown={e => { if (e.key === 'Enter' && e.metaKey && dump.trim()) setPhase(PHASES.DEEPENING) }}
+              onKeyDown={e => {
+                // Enter advances (when there's content); Shift+Enter inserts a newline
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  if (dump.trim()) setPhase(PHASES.DEEPENING)
+                }
+              }}
             />
             <button onClick={() => setPhase(PHASES.DEEPENING)} disabled={!dump.trim()} style={{ background: dump.trim() ? accent : 'rgba(255,255,255,0.08)', color: dump.trim() ? '#0f0d0b' : '#5a5248', border: 'none', borderRadius: '10px', padding: '13px', fontSize: '15px', fontWeight: 600, cursor: dump.trim() ? 'pointer' : 'not-allowed' }}>
               got it, now deepen it →
@@ -714,6 +720,13 @@ export default function JournalPage() {
               ref={textareaRef}
               value={currentAnswer}
               onChange={e => setCurrentAnswer(e.target.value)}
+              onKeyDown={e => {
+                // Enter submits the answer (when there's content); Shift+Enter inserts a newline
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  if (currentAnswer.trim()) handleNextQuestion()
+                }
+              }}
               placeholder={DEEPENING_QUESTIONS[currentQ].placeholder}
               rows={3}
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', padding: '14px', color: '#f0ece4', fontSize: '15px', fontFamily: "'Georgia', serif", lineHeight: 1.6, resize: 'vertical', outline: 'none' }}

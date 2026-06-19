@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
@@ -15,6 +15,10 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+
+  // Refs for moving focus between fields as the user presses Enter
+  const emailRef = useRef<HTMLInputElement>(null)
+  const passwordRef = useRef<HTMLInputElement>(null)
 
   const isSignUp = mode === 'signup'
 
@@ -99,22 +103,26 @@ export default function LoginPage() {
               type="text"
               value={firstName}
               onChange={e => setFirstName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); emailRef.current?.focus() } }}
               placeholder="What name do you go by?"
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', padding: '14px', color: '#f0ece4', fontSize: '15px', outline: 'none', fontFamily: 'inherit' }}
             />
           )}
           <input
+            ref={emailRef}
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); passwordRef.current?.focus() } }}
             placeholder="Email"
             style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', padding: '14px', color: '#f0ece4', fontSize: '15px', outline: 'none', fontFamily: 'inherit' }}
           />
           <input
+            ref={passwordRef}
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleSubmit() }}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSubmit() } }}
             placeholder="Password"
             style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', padding: '14px', color: '#f0ece4', fontSize: '15px', outline: 'none', fontFamily: 'inherit' }}
           />
