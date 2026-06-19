@@ -442,13 +442,16 @@ export default function JournalPage() {
     }
   }
 
-  // Called after all deepening questions are answered — generates summary and saves to DB
-  async function finishCapture() {
+  // Called after all deepening questions are answered — generates summary and saves to DB.
+  // Takes the final answers explicitly: the last question's answer is set via setAnswers()
+  // immediately before this is called, and that state update hasn't flushed yet, so reading
+  // the `answers` state here would drop the final field (e.g. energy → NULL).
+  async function finishCapture(finalAnswers: Record<string, string>) {
     setPhase(PHASES.SAVING)
     try {
       // Tag the idea with its owner so per-user RLS policies can scope access
       const { data: { user } } = await supabase.auth.getUser()
-      const ideaData = { dump, ...answers, timestamp: Date.now() }
+      const ideaData = { dump, ...finalAnswers, timestamp: Date.now() }
       const summary = await generateSummary(ideaData)
       const { data, error } = await supabase
         .from('ideas')
@@ -470,24 +473,26 @@ export default function JournalPage() {
   // Advance to next deepening question, or finish if on last question
   function handleNextQuestion() {
     const q = DEEPENING_QUESTIONS[currentQ]
-    setAnswers(prev => ({ ...prev, [q.key]: currentAnswer }))
+    const nextAnswers = { ...answers, [q.key]: currentAnswer }
+    setAnswers(nextAnswers)
     setCurrentAnswer('')
     if (currentQ < DEEPENING_QUESTIONS.length - 1) {
       setCurrentQ(currentQ + 1)
     } else {
-      finishCapture()
+      finishCapture(nextAnswers)
     }
   }
 
   // Same as next but saves empty string for this question
   function handleSkipQuestion() {
     const q = DEEPENING_QUESTIONS[currentQ]
-    setAnswers(prev => ({ ...prev, [q.key]: '' }))
+    const nextAnswers = { ...answers, [q.key]: '' }
+    setAnswers(nextAnswers)
     setCurrentAnswer('')
     if (currentQ < DEEPENING_QUESTIONS.length - 1) {
       setCurrentQ(currentQ + 1)
     } else {
-      finishCapture()
+      finishCapture(nextAnswers)
     }
   }
 
